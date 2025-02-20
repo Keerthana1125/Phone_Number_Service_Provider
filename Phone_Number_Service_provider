@@ -153,7 +153,7 @@ class PhoneNumberLookupApp:
 
     def get_service_provider(self, parsed_number):
         """Retrieve the service provider using NumVerify API."""
-        api_key = "ENTER-yOUR_API_KEY"  # Replace with an actual NumVerify API key
+        api_key = "ENTER-YOUR_API_KEY"  # Replace with an actual NumVerify API key
         formatted_number = phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.E164)
         url = f"http://apilayer.net/api/validate?access_key={api_key}&number={formatted_number}"
 
