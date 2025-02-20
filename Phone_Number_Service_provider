@@ -1,0 +1,170 @@
+import phonenumbers
+from phonenumbers import geocoder, timezone
+import tkinter as tk
+from tkinter import messagebox, filedialog
+import requests
+
+class PhoneNumberLookupApp:
+    """Application to find phone number details."""
+    
+    def __init__(self, root):  # Fixed __init__ method
+        self.root = root
+        self.root.title("Phone Number Service Provider")
+        
+        # Set window size to full screen
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        self.root.geometry(f"{screen_width}x{screen_height}")
+        self.root.resizable(True, True)
+
+        # Define color scheme
+        self.bg_color = "#D9D9D9"  
+        self.text_color = "#1C2833"  
+        self.button_color = "#ffffff"  
+        self.button_hover_color = "#F13024"  
+        self.result_text_color = "#154360"  
+
+        self.result_display = None  
+        self.screen_width = screen_width  
+        
+        self.setup_ui()
+
+    def setup_ui(self):
+        """Set up the graphical user interface."""
+        self.root.configure(bg=self.bg_color)
+
+        # Title Label
+        title = tk.Label(
+            self.root,
+            text="Phone Number Service Provider",
+            font=("Arial", 20, 'bold'),
+            fg=self.text_color,
+            bg=self.bg_color
+        )
+        title.pack(pady=40)
+
+        # Phone Number Input Label and Field
+        prompt_label = tk.Label(
+            self.root,
+            text="Enter Phone Number with Country Code (e.g., +1 xxxxxxxxxx):",
+            font=("Arial", 14),
+            fg=self.text_color,
+            bg=self.bg_color
+        )
+        prompt_label.pack(pady=10)
+
+        self.phone_entry = tk.Entry(self.root, font=("Arial", 16), width=40, bd=2, relief="solid")
+        self.phone_entry.pack(pady=20)
+
+        # Button Frame
+        button_frame = tk.Frame(self.root, bg=self.bg_color)
+        button_frame.pack(pady=20)
+
+        self.create_button(button_frame, "Lookup", self.lookup_phone_number)
+        self.create_button(button_frame, "Clear", self.clear_fields)
+        self.create_button(button_frame, "Save Result", self.save_to_file)
+
+        # Result Display
+        self.result_display = tk.Text(
+            self.root,
+            font=("Arial", 14),
+            fg=self.result_text_color,
+            bg=self.bg_color,
+            wrap="word",
+            width=60,
+            height=6,
+            relief="solid",
+            bd=2
+        )
+        self.result_display.pack(pady=30)
+        
+        self.result_display.insert(tk.END, "Results will be displayed here...")
+        self.result_display.config(state=tk.DISABLED)
+
+    def create_button(self, frame, text, command):
+        """Create a styled button."""
+        button = tk.Button(
+            frame,
+            text=text,
+            font=("Arial", 12),
+            bg=self.button_color,
+            fg="black",
+            width=12,
+            height=2,
+            relief="flat",
+            command=command
+        )
+        button.pack(side="left", padx=20)
+
+        # Hover effect
+        button.bind("<Enter>", lambda e: button.config(bg=self.button_hover_color))
+        button.bind("<Leave>", lambda e: button.config(bg=self.button_color))
+
+    def lookup_phone_number(self):
+        """Retrieve phone number details."""
+        phone_number = self.phone_entry.get()
+        try:
+            parsed_number = phonenumbers.parse(phone_number)
+            if phonenumbers.is_valid_number(parsed_number):
+                region = ', '.join(timezone.time_zones_for_number(parsed_number))
+                country = geocoder.description_for_number(parsed_number, 'en')
+                carrier = self.get_service_provider(parsed_number)
+
+                result_text = (
+                    f"Region: {region}\n"
+                    f"Service Provider: {carrier}\n"
+                    f"Country: {country}"
+                )
+            else:
+                result_text = "Invalid phone number. Please try again."
+        except phonenumbers.phonenumberutil.NumberParseException:
+            result_text = "Invalid format. Include country code (e.g., +1 xxxxxxxxxx)."
+        
+        self.display_result(result_text)
+
+    def display_result(self, text):
+        """Show results in the text area."""
+        self.result_display.config(state=tk.NORMAL)
+        self.result_display.delete(1.0, tk.END)
+        self.result_display.insert(tk.END, text)
+        self.result_display.config(state=tk.DISABLED)
+
+    def clear_fields(self):
+        """Clear input and result fields."""
+        self.phone_entry.delete(0, tk.END)
+        self.display_result("Results will be displayed here...")
+
+    def save_to_file(self):
+        """Save result to a file."""
+        result_text = self.result_display.get(1.0, tk.END).strip()
+        if not result_text or result_text == "Results will be displayed here...":
+            messagebox.showwarning("No Result", "No information to save.")
+            return
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text Files", ".txt"), ("All Files", ".*")],
+            title="Save Result"
+        )
+        if file_path:
+            with open(file_path, "w") as file:
+                file.write(result_text)
+            messagebox.showinfo("Success", "Result saved successfully!")
+
+    def get_service_provider(self, parsed_number):
+        """Retrieve the service provider using NumVerify API."""
+        api_key = "ab5cf57b8f6e493601919666127e25b9"  # Replace with an actual NumVerify API key
+        formatted_number = phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.E164)
+        url = f"http://apilayer.net/api/validate?access_key={api_key}&number={formatted_number}"
+
+        try:
+            response = requests.get(url)
+            data = response.json()
+            return data.get('carrier', 'Carrier info not available') if data.get('valid') else "Carrier info not available"
+        except requests.exceptions.RequestException:
+            return "API request failed"
+
+
+root = tk.Tk()
+app = PhoneNumberLookupApp(root)
+root.mainloop()
